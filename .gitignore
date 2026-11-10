@@ -1,0 +1,15 @@
+/*
+!/.gitignore
+!/.dockerignore
+!/README.md
+!/lab4.ipynb
+!/concrete.csv
+!/app.py
+!/requirements.txt
+!/Dockerfile
+!/compose.yaml
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/ci.yml

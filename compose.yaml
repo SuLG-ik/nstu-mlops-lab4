@@ -1,0 +1,62 @@
+name: nstu-lab4-flat
+services:
+  api:
+    image: ${API_IMAGE:-concrete-api:v1}
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - prediction_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+  mlflow:
+    image: ${API_IMAGE:-concrete-api:v1}
+    profiles: ["mlops"]
+    ports:
+      - "127.0.0.1:5002:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    command: ["mlflow", "server", "--backend-store-uri", "sqlite:////mlflow/mlflow.db", "--artifacts-destination", "/mlflow/artifacts", "--serve-artifacts", "--host", "0.0.0.0", "--port", "5000", "--workers", "1", "--allowed-hosts", "mlflow,mlflow:5000,localhost,localhost:5000,localhost:5002,127.0.0.1,127.0.0.1:5000,127.0.0.1:5002"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+  training:
+    image: ${API_IMAGE:-concrete-api:v1}
+    profiles: ["mlops"]
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    command:
+      - python
+      - -c
+      - |
+        import json, mlflow, pandas as pd
+        import mlflow.sklearn
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.linear_model import Ridge
+        from sklearn.metrics import mean_absolute_error
+        data = pd.read_csv('concrete.csv')
+        split = json.load(open('runtime/split.json'))
+        train, validation = data.iloc[split['train']], data.iloc[split['validation']]
+        features = list(data.columns.drop('strength'))
+        mlflow.set_experiment('lab4-container-training')
+        with mlflow.start_run(run_name='ridge-container') as run:
+            model = make_pipeline(StandardScaler(), Ridge(alpha=1)).fit(train[features], train['strength'])
+            mlflow.log_param('alpha', 1)
+            mlflow.log_metric('val_mae', mean_absolute_error(validation['strength'], model.predict(validation[features])))
+            saved = mlflow.sklearn.log_model(model, name='model', input_example=validation[features].head(3))
+            mlflow.set_tag('model_uri', saved.model_uri)
+            print(json.dumps({'run_id': run.info.run_id, 'model_uri': saved.model_uri}))
+volumes:
+  prediction_logs:
+  mlflow_data:

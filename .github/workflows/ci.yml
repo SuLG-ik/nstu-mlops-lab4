@@ -1,0 +1,37 @@
+name: Run lab notebook
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MPLBACKEND: module://matplotlib_inline.backend_inline
+      MPLCONFIGDIR: /tmp/matplotlib
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt && python -m pip check
+      - name: Execute the complete notebook
+        run: jupyter nbconvert --execute --to notebook lab4.ipynb --output lab4-ci.ipynb --output-dir runtime --ExecutePreprocessor.timeout=1200
+      - name: Save notebook and measured results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lab4-results
+          path: |
+            runtime/lab4-ci.ipynb
+            runtime/result.json

@@ -1,0 +1,13 @@
+**
+!app.py
+!requirements.txt
+!Dockerfile
+!compose.yaml
+!lab4.ipynb
+!concrete.csv
+!runtime/
+!runtime/model/
+!runtime/model/**
+!runtime/request.json
+!runtime/expected.json
+!runtime/split.json
